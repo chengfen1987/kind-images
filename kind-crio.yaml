@@ -4,22 +4,20 @@ nodes:
 - role: control-plane
   kubeadmConfigPatches:
   - |
+    kind: ClusterConfiguration
+    imageRepository: registry.cn-hangzhou.aliyuncs.com/google_containers
+  - |
     kind: InitConfiguration
+    imageRepository: registry.cn-hangzhou.aliyuncs.com/google_containers
     nodeRegistration:
       criSocket: unix:///var/run/crio/crio.sock
+      kubeletExtraArgs:
+        cgroup-driver: systemd
+        pod-infra-container-image: registry.cn-hangzhou.aliyuncs.com/google_containers/pause:3.8
   - |
     kind: JoinConfiguration
     nodeRegistration:
       criSocket: unix:///var/run/crio/crio.sock
-- role: worker
-  kubeadmConfigPatches:
-  - |
-    kind: JoinConfiguration
-    nodeRegistration:
-      criSocket: unix:///var/run/crio/crio.sock
-- role: worker
-  kubeadmConfigPatches:
-  - |
-    kind: JoinConfiguration
-    nodeRegistration:
-      criSocket: unix:///var/run/crio/crio.sock
+      kubeletExtraArgs:
+        cgroup-driver: systemd
+        pod-infra-container-image: registry.cn-hangzhou.aliyuncs.com/google_containers/pause:3.8
