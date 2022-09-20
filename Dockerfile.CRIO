@@ -1,8 +1,9 @@
 # https://gist.github.com/aojea/bd1fb766302779b77b8f68fa0a81c0f2
 ARG IMAGE=kindest/node
-ARG VERSION=1.22
-ARG MINOR=1
-ARG OS=xUbuntu_21.04
+ARG VERSION=1.25
+ARG MINOR=0
+#ARG OS=xUbuntu_22.04
+ARG OS=xUbuntu_21.10
 
 FROM ${IMAGE}:v${VERSION}.${MINOR}
 
@@ -16,16 +17,22 @@ RUN echo "Installing Packages ..." \
     gnupg \
     tzdata \
  && echo "Installing cri-o" \
-    && export CONTAINERS_URL="https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/${OS}/" \
-    && echo "deb ${CONTAINERS_URL} /" > /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list \
-    && export CRIO_URL="http://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable:/cri-o:/${VERSION}/${OS}/" \
-    && echo "deb ${CRIO_URL} /" > /etc/apt/sources.list.d/devel:kubic:libcontainers:stable:cri-o:${VERSION}.list \
-    && curl -L ${CONTAINERS_URL}Release.key | apt-key add - || true \
-    && curl -L ${CRIO_URL}Release.key | apt-key add - || true \
-    && apt-get update \
-    && DEBIAN_FRONTEND=noninteractive apt-get --option=Dpkg::Options::=--force-confdef install -y cri-o cri-o-runc \
-    && ln -s /usr/libexec/podman/conmon /usr/local/bin/conmon \
-    && printf "[crio.runtime]\ncgroup_manager=\"cgroupfs\"\nconmon_cgroup=\"pod\"\n" > /etc/crio/crio.conf \
-    && sed -i 's/containerd/crio/g' /etc/crictl.yaml \
- && systemctl disable containerd \
+&& echo "deb [signed-by=/usr/share/keyrings/libcontainers-archive-keyring.gpg] https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/$OS/ /" > /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list \
+&& echo "deb [signed-by=/usr/share/keyrings/libcontainers-crio-archive-keyring.gpg] https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable:/cri-o:/$VERSION/$OS/ /" > /etc/apt/sources.list.d/devel:kubic:libcontainers:stable:cri-o:$VERSION.list \
+&& mkdir -p /usr/share/keyrings \
+&& curl -L https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/$OS/Release.key | gpg --dearmor -o /usr/share/keyrings/libcontainers-archive-keyring.gpg \
+&& curl -L https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable:/cri-o:/$VERSION/$OS/Release.key | gpg --dearmor -o /usr/share/keyrings/libcontainers-crio-archive-keyring.gpg 
+
+RUN dpkg --configure -a \
+&& apt-get update \
+&& DEBIAN_FRONTEND=noninteractive apt-get --option=Dpkg::Options::=--force-confdef install -y  cri-o cri-o-runc \
+&& DEBIAN_FRONTEND=noninteractive apt-get --option=Dpkg::Options::=--force-confdef install -y  containernetworking-plugins \
+&& printf "[crio.image]\npause_image = \"registry.cn-hangzhou.aliyuncs.com/google_containers/pause:3.8\"\n\
+           [crio.runtime]\ncgroup_manager=\"systemd\"\nconmon_cgroup=\"pod\"\n" > /etc/crio/crio.conf.d/02-cgroup-manager.conf \
+&&  sed -i 's/containerd/crio/g' /etc/crictl.yaml 
+
+RUN rm -rf /etc/cni/net.d/*
+COPY 10-kindnet.conflist /etc/cni/net.d/10-kindnet.conflist
+
+RUN systemctl disable containerd \
  && systemctl enable crio
